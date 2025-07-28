@@ -1,12 +1,12 @@
 ## Stretching - Writeup
 
 ### 0x1
-
-find string `Error opening file! Error code:` in ida:
+Frist, when we run this program and see "Error opening file! Error code: "
+, so we find string `Error opening file! Error code:` in ida:
 
 ![image-20250728204605868](./image-20250728204605868.png)
 
-x-refs to find where the prog used this string 
+and use x-refs to find where the program used this string 
 
 ![image-20250728204716505](image-20250728204716505.png)
 
