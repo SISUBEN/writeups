@@ -1,14 +1,32 @@
-## Stretching - Writeup
+# Stretching - Writeup
 
-### 0x1
-Frist, when we run this program and see "Error opening file! Error code: "
-, so we find string `Error opening file! Error code:` in ida:
+## 0x1 Information Collection
+
+Frist, use Exeinfo to check more detail information about the program:
+
+![image-20250729144012089](./image-20250729144012089.png)
+
+as we see it is a x64 program which compiled by MinGW-w64 GCC.
+
+Then i choose to run this program first and see what we will get.
+
+```shell
+>> .\Stretching.exe
+Error opening file! Error code:
+```
+
+## 0x2 Static Analysis and Patch
+
+Next, when we run this program and see "Error opening file! Error code: "
+, so we can find string `Error opening file! Error code:` in ida:
 
 ![image-20250728204605868](./image-20250728204605868.png)
 
 and use x-refs to find where the program used this string 
 
 ![image-20250728204716505](image-20250728204716505.png)
+
+as we see this is the key part of the program, but there is still a problem blocked your step
 
 ```c
 __int64 sub_140001836()
@@ -99,15 +117,11 @@ __int64 sub_140001836()
 }
 ```
 
-jump to `0x140001a30`
+ida cannot compile some of asm codes, lets jump to `0x140001a30` and see whats happened
 
 ![image-20250728205151090](image-20250728205151090.png)
 
-some junk codes
-
-patch it
-
-and get this:
+as we see there are some junk code in asm, that's why ida cannot decompile it correctly, so just undefine it and patch it into `nop` and then we can get this:
 
 ```c
 __int64 sub_140001836()
@@ -210,7 +224,7 @@ __int64 sub_140001836()
 }
 ```
 
-and patch at `sub_1400017F3` and `sub_140001450`
+Similarly, patch the junk code at `sub_1400017F3` and `sub_140001450` as well.
 
 ```c
 __int64 sub_1400017F3()
@@ -252,35 +266,45 @@ __int64 __fastcall sub_140001450(__int64 a1, __int64 a2)
 }
 ```
 
-- sub_14000166D (XOR Decryption Function)
+and now we can know what does this program exactly did. **Yippee!!!!**
 
-  - Purpose: Performs cyclic XOR decryption using a 3-byte key (EF BE AD DE ED FE 06)
-  - Behavior: Processes input buffer until NULL terminator is found
-- sub_1400017F3 (Anti-Debug/Exception Handler)
+`sub_14000166D` (XOR Decryption Function)
 
-  - Purpose: Accesses TEB structure with exception handling instructions
-  - Likely use: Anti-debugging checks or code protection
-- sub_1400016ED (Data Processing Function)
+- Purpose: Performs cyclic XOR decryption using a 3-byte key (EF BE AD DE ED FE 06)
+- Behavior: Processes input buffer until NULL terminator is found
 
-  - Purpose: Performs bit manipulation and endianness conversion
-  - Operations: Circular right shifts each byte + byte swapping
-- sub_140001450 (TEA Encryption Implementation)
+`sub_1400017F3` (Anti-Debug/Exception Handler)
 
-  - Purpose: 32-round variant of Tiny Encryption Algorithm
-  - Characteristics: Uses complex bit operations with key scheduling
-- sub_140003C70 (Wrapper Function)
+- Purpose: Accesses TEB structure with exception handling instructions
+- Likely use: Anti-debugging checks or code protection
 
-  - Purpose: Simple call-through to sub_140002D50
+`sub_1400016ED` (Data Processing Function)
 
-## 0x02 dynamic analysis
+- Purpose: Performs bit manipulation and endianness conversion
+- Operations: Circular right shifts each byte + byte swapping
 
-set a breakpoint at `0x7ff60d0818de Stream = fopen(v17, "r");` and see that is the value of v17
+`sub_140001450` (TEA Encryption Implementation)
+
+- Purpose: 32-round variant of Tiny Encryption Algorithm
+- Characteristics: Uses complex bit operations with key scheduling
+
+`sub_140003C70` (Wrapper Function)
+
+- Purpose: Simple call-through to sub_140002D50
+
+## 0x03 Dynamic Analysis
+
+To know what the program did, we should know what file did the program read. Owing to the path has been encrypted
+
+Thus we need to set a breakpoint at `0x7ff60d0818de Stream = fopen(v17, "r");` (this line is the program used to read the file). Then run the program, when the program reaches the breakpoint and see that is the value of `v17`.
 
 ![image](image-20250728233104878.png)
 
-the read file path is `C:\\flag.txt`
+So we can get the read file path is `C:\\flag.txt`. So i created a the `flag.txt` in `C:\\` and filled random content.
 
 ![image-20250728233750690](image-20250728233750690.png)
+
+The program read `C:\\flag.txt` and define `Buf2`, if we use a debugger to attach the program, then `sfub_7FF60D0817F3()` will be `True` and enter the if branch which we do not intended else call `sub_7FF7078416ED(v3, m)` then call `sub_7FF707841450()`, finally compare the value between `memcmp`and `Buf2`. So we need to patch the if-condition and let the program do not enter the if-condition.
 
 ```c
 if ( sub_7FF7078417F3() )
@@ -305,20 +329,22 @@ if ( sub_7FF7078417F3() )
   }
 ```
 
-if we use a debugger to attach the program then `sfub_7FF60D0817F3()` will be `True` and enter the if branch else call `sub_7FF7078416ED(v3, m)` then call `sub_7FF707841450()`, finally compare the value between `memcmp`and `Buf2`. So we need to patch the if-condition.
-
 change `jz` into `jnz`
 
-![image-20250729001041087](image-20250729001041087.png)and sea breakpoint at `jz loc_7FF7A5591B33`
+![image-20250729001041087](image-20250729001041087.png)and set breakpoint at `jz loc_7FF7A5591B33` to get the value of `v4`.
 
 ```c
 for ( n = 0; n <= 0x2Fu; n += 8 )
     sub_7FF707841450(v4, &Buffer[n]);
 ```
 
-and get the value of v4 by dynamic debugging which is the key of XTEA encrypt, and we have `key=[0x65657246,0x6c61505f,0x69747365,0x2121656e], delta=0xB979379E`
+`v4` is the key of XTEA encrypt, then we have 
 
-and we can write the decrypt script
+`key=[0x65657246,0x6c61505f,0x69747365,0x2121656e], delta=0xB979379E`
+
+So that we can write the decrypt script.
+
+### decrypt.py
 
 ```python
 from Crypto.Util.number import *
