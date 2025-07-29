@@ -4,7 +4,7 @@
 
 Frist, use Exeinfo to check more detail information about the program:
 
-![image-20250729144012089](image-20250729001041087.png)
+![image-20250729144012089](c257b2f6fc8c1e0c4686634c7325bf3c.png)
 
 as we see it is a x64 program which compiled by MinGW-w64 GCC.
 
