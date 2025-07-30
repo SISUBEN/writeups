@@ -2,7 +2,7 @@
 
 ## 0x1 Information Collection
 
-Frist, use Exeinfo to check more detail information about the program:
+Firstly, use Exeinfo to check more detail information about the program:
 
 ![image-20250729144012089](c257b2f6fc8c1e0c4686634c7325bf3c.png)
 
